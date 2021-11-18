@@ -1,0 +1,43 @@
+import "util.scrypt";
+
+/**
+ * A toy token example between two holders
+ */
+
+ struct Account {
+     PubKey pubKey;
+     int balance;
+ }
+contract Token {
+
+    @state
+    Account[2] accounts;
+
+    public function transfer(PubKey sender, Sig senderSig, PubKey receiver, int value /* amount to be transferred */, SigHashPreimage txPreimage, int amount) {
+        // this ensures the preimage is for the current tx
+        require(Tx.checkPreimage(txPreimage));
+
+        // authorize
+        require(checkSig(senderSig, sender));
+
+        // only between two holders
+        require(sender == this.accounts[0].pubKey && receiver == this.accounts[1].pubKey || sender == this.accounts[1].pubKey && receiver == this.accounts[0].pubKey);
+
+        // transfer
+        if (sender == this.accounts[0].pubKey) {
+            require(this.accounts[0].balance >= value);
+            this.accounts[0].balance -= value;
+            this.accounts[1].balance += value;
+        }
+        else {
+            require(this.accounts[1].balance >= value);
+            this.accounts[1].balance -= value;
+            this.accounts[0].balance += value;
+        }
+
+        // write new locking script
+        bytes stateScript = this.getStateScript();
+        bytes output = Util.buildOutput(stateScript, amount);
+        require(hash256(output) == Util.hashOutputs(txPreimage));
+    }
+}

@@ -1,0 +1,16 @@
+dist: bionic
+language: node_js
+node_js:
+ - 14
+os:
+  - linux
+  - osx
+  - windows
+
+#before_install:
+#  - npm i -g npm@latest
+
+script:
+
+  - npx scryptlib download
+  - npm t

@@ -1,0 +1,83 @@
+import "util.scrypt";
+
+// Conway Game Of Life on a board of N * N
+contract GameOfLife {
+
+
+
+    static const int N = 5;
+    // effctively we play on a grid of (N+2) * (N+2) without handling boundary cells
+    static const int BOARD_SIZE = GameOfLife.N + 2;
+    static bytes LIVE = b'01';
+    static bytes DEAD = b'00';
+    static const int LOOP_NEIGHBORS = 3;
+
+    @state
+    bytes board;
+
+    public function play(int amount, SigHashPreimage txPreimage) {
+        require(Tx.checkPreimage(txPreimage));
+
+        // make the move
+        this.board = GameOfLife.evolve(this.board);
+
+        // update state: next turn & next board
+        bytes scriptCode_ = this.getStateScript();
+        bytes output = Util.buildOutput(scriptCode_, amount);
+        bytes outputs = output;
+
+        require(hash256(outputs) == Util.hashOutputs(txPreimage));
+    }
+
+    static function evolve(bytes oldBoard) : bytes {
+        bytes newBoard = oldBoard;
+
+        int i = 1;
+        loop (GameOfLife.N) {
+            int j = 1;
+            loop (GameOfLife.N) {
+                bytes nextState = GameOfLife.next(oldBoard, i, j);
+                newBoard = Util.setElemAt(newBoard, GameOfLife.index(i, j), nextState);
+
+                j++;
+            }
+
+            i++;
+        }
+
+        return newBoard;
+    }
+
+    static function next(bytes oldBoard, int row, int col) : bytes {
+        // number of neighbors alive
+        int alive = 0;
+
+        int i = -1;
+        loop (LOOP_NEIGHBORS) {
+            int j = -1;
+
+            loop (LOOP_NEIGHBORS) {
+                if (!(i == 0 && j == 0)) {
+                    if (Util.getElemAt(oldBoard, GameOfLife.index(row + i, col + j))) {
+                        alive++;
+                    }
+                }
+                j++;
+            }
+
+            i++;
+        }
+
+        bytes oldState = Util.getElemAt(oldBoard, GameOfLife.index(row, col));
+        /* rule
+        1. Any live cell with two or three live neighbours survives.
+        2. Any dead cell with three live neighbours becomes a live cell.
+        3. All other live cells die in the next generation. Similarly, all other dead cells stay dead.
+        */
+        return (alive == 3 || alive == 2 && oldState == LIVE) ? LIVE : DEAD;
+    }
+
+    static function index(int i, int j) : int {
+        return i * GameOfLife.BOARD_SIZE + j;
+    }
+}
